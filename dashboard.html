@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard สรุปผลข้อมูลการอนุเคราะห์ - ค้างชำระ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Sarabun', sans-serif; background-color: #f3f4f6; }
+
+    /* --- ตั้งค่าการพิมพ์ (Print Settings) --- */
+    @page {
+      size: landscape; /* บังคับแนวนอน */
+      margin: 10mm;    /* ตั้งระยะขอบกระดาษ */
+    }
+
+    @media print {
+      .no-print { display: none !important; } /* ซ่อนปุ่มต่างๆ */
+      body {
+        background-color: white;
+        -webkit-print-color-adjust: exact; /* บังคับให้พิมพ์สีพื้นหลัง */
+        print-color-adjust: exact;
+      }
+      .break-page { page-break-before: always; } /* ขึ้นหน้าใหม่ */
+      .shadow-lg { box-shadow: none !important; border: 1px solid #ddd; } /* ลบเงาตอนพิมพ์ */
+
+      /* ปรับขนาดตัวอักษรเล็กน้อยเพื่อให้พอดีหน้ากระดาษแนวนอน */
+      .text-3xl { font-size: 1.5rem; }
+      .text-2xl { font-size: 1.25rem; }
+      .p-6 { padding: 1rem; } /* ลด padding ตอนพิมพ์ */
+    }
+
+    .card-stat { transition: all 0.3s; }
+    .card-stat:hover { transform: translateY(-2px); }
+    .chart-wrap { position: relative; height: 220px; }
+    .chart-wrap-sm { position: relative; height: 180px; }
+  </style>
+</head>
+<body class="p-4 md:p-8">
+
+  <div class="max-w-screen-2xl mx-auto"> <div class="flex flex-col md:flex-row justify-between items-center mb-8 no-print gap-4">
+      <div class="flex items-center gap-4">
+        <a href="index.html" class="bg-white border hover:bg-gray-50 px-4 py-2 rounded-lg text-gray-700 shadow-sm transition">
+          <i class="fas fa-arrow-left mr-2"></i> กลับหน้าบันทึก
+        </a>
+        <a href="search.html" class="bg-white border hover:bg-gray-50 px-4 py-2 rounded-lg text-gray-700 shadow-sm transition text-teal-700 font-medium">
+          <i class="fas fa-search mr-2"></i> ค้นหาประวัติ
+        </a>
+        <div>
+           <h1 class="text-2xl font-bold text-gray-800">Dashboard สรุปผลข้อมูลการอนุเคราะห์ - ค้างชำระ</h1>
+           <p class="text-sm text-gray-500">กลุ่มงานสังคมสงเคราะห์ โรงพยาบาลสมเด็จพระสังฆราช (อมฺพรมหาเถร)</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-2 items-center bg-white p-3 rounded-lg shadow-sm border">
+        <div class="flex items-center gap-2">
+            <i class="far fa-calendar-alt text-gray-400"></i>
+            <select id="filterMonth" class="border-gray-200 rounded text-sm focus:ring-teal-500 focus:border-teal-500">
+            <option value="all">ทุกเดือน</option>
+            </select>
+        </div>
+        <div class="flex items-center gap-2">
+            <select id="filterYear" class="border-gray-200 rounded text-sm focus:ring-teal-500 focus:border-teal-500">
+            <option value="all">ทุกปีงบฯ</option>
+            </select>
+        </div>
+        <button onclick="loadData()" class="bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700 transition text-sm font-medium">
+            <i class="fas fa-sync-alt mr-1"></i> ประมวลผล
+        </button>
+        <button onclick="exportCSV()" class="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 transition text-sm font-medium">
+            <i class="fas fa-file-csv mr-1"></i> Export CSV
+        </button>
+        <button onclick="window.print()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition text-sm font-medium">
+           <i class="fas fa-print mr-1"></i> พิมพ์
+        </button>
+      </div>
+    </div>
+
+    <div id="loading" class="hidden text-center py-20">
+        <i class="fas fa-circle-notch fa-spin text-4xl text-teal-600"></i>
+        <p class="mt-4 text-gray-600">กำลังประมวลผลข้อมูล...</p>
+    </div>
+
+    <div id="reportContent" class="space-y-8 hidden">
+
+      <!-- ===== สรุปภาพรวม (KPI รวม อนุเคราะห์ + ค้างชำระ) ===== -->
+      <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+        <div class="bg-gray-800 px-6 py-3 flex justify-between items-center text-white">
+          <h2 class="text-lg font-bold flex items-center">
+            <i class="fas fa-layer-group mr-3 text-gray-300"></i> ภาพรวมทั้งหมด
+          </h2>
+          <span class="text-sm bg-gray-700 px-3 py-1 rounded-full" id="overall-date-range">ทั้งหมด</span>
+        </div>
+        <div class="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-gray-50 p-4 rounded-lg text-center border">
+            <div class="text-xs text-gray-500">ผู้ป่วยรวมทั้งหมด</div>
+            <div class="text-2xl font-bold text-gray-800 my-1" id="overall-total">0</div>
+            <div class="text-xs text-gray-400">ราย</div>
+          </div>
+          <div class="bg-teal-50 p-4 rounded-lg text-center border border-teal-100">
+            <div class="text-xs text-teal-700">ยอดอนุเคราะห์รวม</div>
+            <div class="text-2xl font-bold text-teal-700 my-1" id="overall-assist">0</div>
+            <div class="text-xs text-teal-400">บาท</div>
+          </div>
+          <div class="bg-red-50 p-4 rounded-lg text-center border border-red-100">
+            <div class="text-xs text-red-700">ยอดค้างชำระรวม</div>
+            <div class="text-2xl font-bold text-red-700 my-1" id="overall-debt">0</div>
+            <div class="text-xs text-red-400">บาท</div>
+          </div>
+          <div class="bg-blue-50 p-4 rounded-lg text-center border border-blue-100">
+            <div class="text-xs text-blue-700">วันนอนรวมทั้งหมด</div>
+            <div class="text-2xl font-bold text-blue-700 my-1" id="overall-admit-days">0</div>
+            <div class="text-xs text-blue-400">วัน</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== แนวโน้มรายเดือน (ตามปีงบที่เลือก) ===== -->
+      <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 no-print-avoid">
+        <div class="bg-indigo-700 px-6 py-3 flex justify-between items-center text-white">
+          <h2 class="text-lg font-bold flex items-center">
+            <i class="fas fa-chart-line mr-3 text-indigo-200"></i> แนวโน้มรายเดือน (ปีงบฯ ที่เลือก)
+          </h2>
+        </div>
+        <div class="p-6">
+          <div class="chart-wrap">
+            <canvas id="trendChart"></canvas>
+          </div>
+          <p class="text-xs text-gray-400 mt-2">* กราฟนี้แสดงข้อมูลทั้งปีงบประมาณที่เลือกเสมอ ไม่ขึ้นกับตัวกรอง "เดือน" ด้านบน</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-teal-100">
+         <div class="bg-teal-700 px-6 py-3 flex justify-between items-center text-white">
+            <h2 class="text-lg font-bold flex items-center">
+                <i class="fas fa-hand-holding-heart mr-3 text-teal-200"></i> 1. สรุปข้อมูลการอนุเคราะห์
+            </h2>
+            <span class="text-sm bg-teal-800 px-3 py-1 rounded-full" id="ast-date-range">ทั้งหมด</span>
+         </div>
+
+         <div class="p-6">
+             <div class="flex items-center mb-4 border-l-4 border-teal-500 pl-3">
+                <h3 class="text-md font-semibold text-gray-800">จำนวนผู้ป่วยและวันนอน</h3>
+             </div>
+
+             <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+                <div class="col-span-2 md:col-span-1 bg-teal-50 p-3 rounded-lg text-center border border-teal-100">
+                    <div class="text-xs text-gray-500">ผู้ป่วยทั้งหมด</div>
+                    <div class="text-2xl font-bold text-teal-700 my-1" id="ast-total">0</div>
+                    <div class="text-xs text-gray-400">ราย</div>
+                </div>
+                <div class="bg-white p-2 rounded-lg border text-center card-stat">
+                    <div class="text-xs text-gray-500">ใหม่ OPD</div>
+                    <div class="text-lg font-bold text-gray-800" id="ast-new-opd">0</div>
+                </div>
+                <div class="bg-white p-2 rounded-lg border text-center card-stat">
+                    <div class="text-xs text-gray-500">เก่า OPD</div>
+                    <div class="text-lg font-bold text-gray-800" id="ast-old-opd">0</div>
+                </div>
+                <div class="bg-white p-2 rounded-lg border text-center card-stat">
+                    <div class="text-xs text-gray-500">ใหม่ IPD</div>
+                    <div class="text-lg font-bold text-gray-800" id="ast-new-ipd">0</div>
+                </div>
+                <div class="bg-white p-2 rounded-lg border text-center card-stat">
+                    <div class="text-xs text-gray-500">เก่า IPD</div>
+                    <div class="text-lg font-bold text-gray-800" id="ast-old-ipd">0</div>
+                </div>
+                <div class="bg-blue-50 p-2 rounded-lg border border-blue-100 text-center">
+                    <div class="text-xs text-blue-600 font-semibold">วันนอนรวม (IPD)</div>
+                    <div class="text-xl font-bold text-blue-700" id="ast-admit-days">0</div>
+                    <div class="text-xs text-blue-400">วัน</div>
+                </div>
+             </div>
+
+             <div class="flex items-center mb-4 border-l-4 border-teal-500 pl-3">
+                <h3 class="text-md font-semibold text-gray-800">ข้อมูลค่ารักษาพยาบาล (แสดง % เทียบยอดเต็ม)</h3>
+             </div>
+             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                 <div class="p-3 bg-gray-50 rounded border">
+                     <div class="text-xs text-gray-500">ค่ารักษาเต็มจำนวน</div>
+                     <div class="text-md font-bold text-gray-800" id="ast-cost-full">0</div>
+                     <div class="text-xs text-gray-400">บาท (100%)</div>
+                 </div>
+                 <div class="p-3 bg-gray-50 rounded border">
+                     <div class="text-xs text-gray-500">ชำระเอง</div>
+                     <div class="text-md font-bold text-gray-800" id="ast-cost-pay">0</div>
+                     <div class="text-xs text-gray-400" id="ast-cost-pay-pct">0%</div>
+                 </div>
+                 <div class="p-3 bg-teal-100 rounded border border-teal-200">
+                     <div class="text-xs text-teal-800 font-bold">อนุเคราะห์ (สงเคราะห์)</div>
+                     <div class="text-lg font-bold text-teal-700" id="ast-cost-assist">0</div>
+                     <div class="text-xs text-teal-600" id="ast-cost-assist-pct">0%</div>
+                 </div>
+                 <div class="p-3 bg-gray-50 rounded border">
+                     <div class="text-xs text-gray-500">ค่ารักษาโดยสิทธิอื่น</div>
+                     <div class="text-md font-bold text-gray-800" id="ast-cost-right">0</div>
+                     <div class="text-xs text-gray-400" id="ast-cost-right-pct">0%</div>
+                 </div>
+             </div>
+
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                <div class="bg-gray-50 rounded-lg p-4 border">
+                   <h4 class="font-semibold text-gray-700 mb-2 text-xs">สัดส่วนพื้นที่ผู้รับบริการ</h4>
+                   <div class="chart-wrap-sm"><canvas id="ast-chart-address"></canvas></div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4 border">
+                   <h4 class="font-semibold text-gray-700 mb-2 text-xs">สัดส่วนสัญชาติ</h4>
+                   <div class="chart-wrap-sm"><canvas id="ast-chart-nationality"></canvas></div>
+                </div>
+             </div>
+
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <div class="space-y-4">
+                     <div>
+                         <h4 class="font-semibold text-gray-700 mb-2 text-xs bg-gray-100 p-1.5 rounded">ที่อยู่ผู้รับบริการ</h4>
+                         <table class="w-full text-xs">
+                             <thead class="bg-gray-50 text-gray-500 text-left"><tr><th class="py-1 px-2">พื้นที่</th><th class="text-right px-2">จำนวน</th><th class="text-right px-2">%</th></tr></thead>
+                             <tbody id="ast-table-address" class="divide-y divide-gray-100"></tbody>
+                         </table>
+                     </div>
+                     <div>
+                         <h4 class="font-semibold text-gray-700 mb-2 text-xs bg-gray-100 p-1.5 rounded">กลุ่มเป้าหมาย</h4>
+                         <table class="w-full text-xs">
+                              <thead class="bg-gray-50 text-gray-500 text-left"><tr><th class="py-1 px-2">กลุ่ม</th><th class="text-right px-2">จำนวน</th><th class="text-right px-2">%</th></tr></thead>
+                             <tbody id="ast-table-target" class="divide-y divide-gray-100"></tbody>
+                         </table>
+                     </div>
+                     <div>
+                         <h4 class="font-semibold text-gray-700 mb-2 text-xs bg-gray-100 p-1.5 rounded">สัญชาติ</h4>
+                         <div class="flex flex-wrap gap-2 text-xs" id="ast-tags-nation"></div>
+                     </div>
+                 </div>
+
+                 <div class="space-y-4">
+                     <div>
+                         <h4 class="font-semibold text-gray-700 mb-2 text-xs bg-gray-100 p-1.5 rounded">ห้องตรวจ / หอผู้ป่วย (Top 5)</h4>
+                         <table class="w-full text-xs">
+                             <thead class="bg-gray-50 text-gray-500 text-left"><tr><th class="py-1 px-2">ชื่อ</th><th class="text-right px-2">จำนวน</th><th class="text-right px-2">%</th></tr></thead>
+                             <tbody id="ast-table-ward" class="divide-y divide-gray-100"></tbody>
+                         </table>
+                     </div>
+                     <div>
+                         <h4 class="font-semibold text-gray-700 mb-2 text-xs bg-gray-100 p-1.5 rounded">โรค ICD10 (Top 10)</h4>
+                         <table class="w-full text-xs">
+                             <thead class="bg-gray-50 text-gray-500 text-left"><tr><th class="py-1 px-2">รหัส/ชื่อโรค</th><th class="text-right px-2">จำนวน</th><th class="text-right px-2">%</th></tr></thead>
+                             <tbody id="ast-table-icd" class="divide-y divide-gray-100"></tbody>
+                         </table>
+                     </div>
+                 </div>
+             </div>
+         </div>
+      </div>
+
+      <div class="break-page"></div>
+
+      <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-red-100">
+         <div class="bg-red-700 px-6 py-3 flex justify-between items-center text-white">
+            <h2 class="text-lg font-bold flex items-center">
+                <i class="fas fa-file-invoice-dollar mr-3 text-red-200"></i> 2. สรุปข้อมูลค้างชำระ
+            </h2>
+            <span class="text-sm bg-red-800 px-3 py-1 rounded-full" id="debt-date-range">ทั้งหมด</span>
+         </div>
+
+         <div class="p-6">
+             <div class="flex items-center mb-4 border-l-4 border-red-500 pl-3">
+                <h3 class="text-md font-semibold text-gray-800">จำนวนผู้ป่วยและวันนอน</h3>
+             </div>
+             <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+                <div class="col-span-2 md:col-span-1 bg-red-50 p-3 rounded-lg text-center border border-red-100">
+                    <div class="text-xs text-gray-500">ผู้ป่วยทั้งหมด</div>
+                    <div class="text-2xl font-bold text-red-700 my-1" id="debt-total">0</div>
+                    <div class="text-xs text-gray-400">ราย</div>
+                </div>
+                <div class="bg-white p-2 rounded-lg border text-center card-stat">
+                    <div class="text-xs text-gray-500">ใหม่ OPD</div>
+                    <div class="text-lg font-bold text-gray-800" id="debt-new-opd">0</div>
+                </div>
+                <div class="bg-white p-2 rounded-lg border text-center card-stat">
+                    <div class="text-xs text-gray-500">เก่า OPD</div>
+                    <div class="text-lg font-bold text-gray-800" id="debt-old-opd">0</div>
+                </div>
+                <div class="bg-white p-2 rounded-lg border text-center card-stat">
+                    <div class="text-xs text-gray-500">ใหม่ IPD</div>
+                    <div class="text-lg font-bold text-gray-800" id="debt-new-ipd">0</div>
+                </div>
+                <div class="bg-white p-2 rounded-lg border text-center card-stat">
+                    <div class="text-xs text-gray-500">เก่า IPD</div>
+                    <div class="text-lg font-bold text-gray-800" id="debt-old-ipd">0</div>
+                </div>
+                <div class="bg-blue-50 p-2 rounded-lg border border-blue-100 text-center">
+                    <div class="text-xs text-blue-600 font-semibold">วันนอนรวม (IPD)</div>
+                    <div class="text-xl font-bold text-blue-700" id="debt-admit-days">0</div>
+                    <div class="text-xs text-blue-400">วัน</div>
+                </div>
+             </div>
+
+             <div class="flex items-center mb-4 border-l-4 border-red-500 pl-3">
+                <h3 class="text-md font-semibold text-gray-800">ข้อมูลค่ารักษาพยาบาล (แสดง % เทียบยอดเต็ม)</h3>
+             </div>
+             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                 <div class="p-3 bg-gray-50 rounded border">
+                     <div class="text-xs text-gray-500">ค่ารักษาเต็มจำนวน</div>
+                     <div class="text-md font-bold text-gray-800" id="debt-cost-full">0</div>
+                     <div class="text-xs text-gray-400">บาท (100%)</div>
+                 </div>
+                 <div class="p-3 bg-gray-50 rounded border">
+                     <div class="text-xs text-gray-500">ชำระเอง</div>
+                     <div class="text-md font-bold text-gray-800" id="debt-cost-pay">0</div>
+                     <div class="text-xs text-gray-400" id="debt-cost-pay-pct">0%</div>
+                 </div>
+                 <div class="p-3 bg-red-100 rounded border border-red-200">
+                     <div class="text-xs text-red-800 font-bold">ค้างชำระ</div>
+                     <div class="text-lg font-bold text-red-700" id="debt-cost-debt">0</div>
+                     <div class="text-xs text-red-600" id="debt-cost-debt-pct">0%</div>
+                 </div>
+                 <div class="p-3 bg-gray-50 rounded border">
+                     <div class="text-xs text-gray-500">ค่ารักษาโดยสิทธิอื่น</div>
+                     <div class="text-md font-bold text-gray-800" id="debt-cost-right">0</div>
+                     <div class="text-xs text-gray-400" id="debt-cost-right-pct">0%</div>
+                 </div>
+             </div>
+
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                <div class="bg-gray-50 rounded-lg p-4 border">
+                   <h4 class="font-semibold text-gray-700 mb-2 text-xs">สัดส่วนพื้นที่ผู้รับบริการ</h4>
+                   <div class="chart-wrap-sm"><canvas id="debt-chart-address"></canvas></div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4 border">
+                   <h4 class="font-semibold text-gray-700 mb-2 text-xs">สัดส่วนสัญชาติ</h4>
+                   <div class="chart-wrap-sm"><canvas id="debt-chart-nationality"></canvas></div>
+                </div>
+             </div>
+
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <div class="space-y-4">
+                     <div>
+                         <h4 class="font-semibold text-gray-700 mb-2 text-xs bg-gray-100 p-1.5 rounded">ที่อยู่ผู้รับบริการ</h4>
+                         <table class="w-full text-xs">
+                             <thead class="bg-gray-50 text-gray-500 text-left"><tr><th class="py-1 px-2">พื้นที่</th><th class="text-right px-2">จำนวน</th><th class="text-right px-2">%</th></tr></thead>
+                             <tbody id="debt-table-address" class="divide-y divide-gray-100"></tbody>
+                         </table>
+                     </div>
+                     <div>
+                         <h4 class="font-semibold text-gray-700 mb-2 text-xs bg-gray-100 p-1.5 rounded">กลุ่มเป้าหมาย</h4>
+                         <table class="w-full text-xs">
+                             <thead class="bg-gray-50 text-gray-500 text-left"><tr><th class="py-1 px-2">กลุ่ม</th><th class="text-right px-2">จำนวน</th><th class="text-right px-2">%</th></tr></thead>
+                             <tbody id="debt-table-target" class="divide-y divide-gray-100"></tbody>
+                         </table>
+                     </div>
+                     <div>
+                         <h4 class="font-semibold text-gray-700 mb-2 text-xs bg-gray-100 p-1.5 rounded">สัญชาติ</h4>
+                         <div class="flex flex-wrap gap-2 text-xs" id="debt-tags-nation"></div>
+                     </div>
+                 </div>
+
+                 <div class="space-y-4">
+                     <div>
+                         <h4 class="font-semibold text-gray-700 mb-2 text-xs bg-gray-100 p-1.5 rounded">ห้องตรวจ / หอผู้ป่วย (Top 5)</h4>
+                         <table class="w-full text-xs">
+                             <thead class="bg-gray-50 text-gray-500 text-left"><tr><th class="py-1 px-2">ชื่อ</th><th class="text-right px-2">จำนวน</th><th class="text-right px-2">%</th></tr></thead>
+                             <tbody id="debt-table-ward" class="divide-y divide-gray-100"></tbody>
+                         </table>
+                     </div>
+                     <div>
+                         <h4 class="font-semibold text-gray-700 mb-2 text-xs bg-gray-100 p-1.5 rounded">โรค ICD10 (Top 10)</h4>
+                         <table class="w-full text-xs">
+                             <thead class="bg-gray-50 text-gray-500 text-left"><tr><th class="py-1 px-2">รหัส/ชื่อโรค</th><th class="text-right px-2">จำนวน</th><th class="text-right px-2">%</th></tr></thead>
+                             <tbody id="debt-table-icd" class="divide-y divide-gray-100"></tbody>
+                         </table>
+                     </div>
+                 </div>
+             </div>
+         </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ==========================================================================
+    // API_URL: URL ของ Google Apps Script Web App (ลงท้ายด้วย /exec)
+    // ==========================================================================
+    const API_URL = "https://script.google.com/macros/s/AKfycbwsI_1502NZihQnQ_c27ngyqThk0S2jbnX4rKUCnHTimjsyulZ5et2lmqp0E2IGVGFg/exec"; // TODO: แก้เป็น URL จริง
+
+    async function apiGet(action, params) {
+      const usp = new URLSearchParams(Object.assign({ action }, params || {}));
+      const res = await fetch(`${API_URL}?${usp.toString()}`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || 'เกิดข้อผิดพลาดจาก API');
+      return json.data;
+    }
+
+    let rawData = { assistance: [], debt: [] };   // ข้อมูลตามตัวกรองปัจจุบัน (เดือน+ปีงบ)
+    let trendData = { assistance: [], debt: [] }; // ข้อมูลทั้งปีงบ (ไม่กรองเดือน) สำหรับกราฟแนวโน้ม
+    let charts = {}; // เก็บ instance ของ Chart.js เพื่อ destroy ก่อน render ใหม่
+
+    // --- 1. Init Controls (สร้างตัวเลือก ปี/เดือน) ---
+    const months = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+    const mSelect = document.getElementById('filterMonth');
+    months.forEach((m, i) => {
+        let opt = document.createElement('option');
+        opt.value = i;
+        opt.text = m;
+        mSelect.appendChild(opt);
+    });
+    mSelect.value = new Date().getMonth();
+
+    const ySelect = document.getElementById('filterYear');
+    const today = new Date();
+    const curFiscalYear = today.getMonth() >= 9 ? today.getFullYear() + 1 : today.getFullYear();
+
+    function populateYearOptions(extraYears) {
+        const existing = new Set(Array.from(ySelect.options).map(o => o.value));
+        const yearsToAdd = new Set();
+        for (let i = curFiscalYear; i >= curFiscalYear - 4; i--) yearsToAdd.add(i);
+        (extraYears || []).forEach(y => yearsToAdd.add(y));
+
+        Array.from(yearsToAdd).sort((a, b) => b - a).forEach(y => {
+            if (existing.has(String(y))) return;
+            let opt = document.createElement('option');
+            opt.value = y;
+            opt.text = "ปีงบ " + (y + 543);
+            ySelect.appendChild(opt);
+        });
+    }
+    populateYearOptions();
+    ySelect.value = curFiscalYear;
+
+    // ดึงรายการปีงบที่มีข้อมูลจริงจาก server มาเติม dropdown (เผื่อมีข้อมูลเก่ากว่า 4 ปี)
+    apiGet('years')
+      .then((years) => { populateYearOptions(years); ySelect.value = curFiscalYear; })
+      .catch(() => {});
+
+    // --- 2. Load Data (กรองที่ server แล้ว) ---
+    async function loadData() {
+        document.getElementById('loading').classList.remove('hidden');
+        document.getElementById('reportContent').classList.add('hidden');
+
+        const selectedMonth = mSelect.value; // 'all' หรือ 0-11
+        const selectedYear = ySelect.value;  // 'all' หรือปี ค.ศ.
+
+        try {
+          rawData = await apiGet('dashboard', { fiscalYear: selectedYear, month: selectedMonth });
+          // โหลดข้อมูลทั้งปีงบ (ไม่กรองเดือน) เพิ่มสำหรับกราฟแนวโน้มรายเดือน
+          try {
+            trendData = await apiGet('dashboard', { fiscalYear: selectedYear, month: 'all' });
+          } catch (err) {
+            trendData = { assistance: [], debt: [] };
+          }
+          renderDashboard();
+        } catch (err) {
+          document.getElementById('loading').classList.add('hidden');
+          alert("Error: " + err.message);
+        }
+    }
+
+    function renderDashboard() {
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('reportContent').classList.remove('hidden');
+
+        const selectedMonth = mSelect.value;
+        const selectedYear = ySelect.value;
+        const mText = selectedMonth === 'all' ? 'ทุกเดือน' : months[selectedMonth];
+        const yText = selectedYear === 'all' ? 'ทุกปีงบฯ' : (parseInt(selectedYear) + 543);
+        const rangeText = `เดือน ${mText} ปีงบฯ ${yText}`;
+        document.getElementById('ast-date-range').innerText = rangeText;
+        document.getElementById('debt-date-range').innerText = rangeText;
+        document.getElementById('overall-date-range').innerText = rangeText;
+
+        processSection('ast', rawData.assistance || [], 'costAssist');
+        processSection('debt', rawData.debt || [], 'costDebt');
+        renderOverallSummary(rawData.assistance || [], rawData.debt || []);
+        renderTrendChart(trendData.assistance || [], trendData.debt || []);
+    }
+
+    // Helper: Calculate Percentage
+    const getPct = (val, total) => {
+        if (!total || total === 0) return '0%';
+        return ((val / total) * 100).toFixed(1) + '%';
+    };
+    const sumField = (arr, key) => arr.reduce((acc, curr) => acc + (Number(curr[key]) || 0), 0);
+
+    // --- ภาพรวมรวม (KPI) ---
+    function renderOverallSummary(astData, debtData) {
+        document.getElementById('overall-total').innerText = (astData.length + debtData.length).toLocaleString();
+        document.getElementById('overall-assist').innerText = sumField(astData, 'costAssist').toLocaleString();
+        document.getElementById('overall-debt').innerText = sumField(debtData, 'costDebt').toLocaleString();
+        document.getElementById('overall-admit-days').innerText =
+            (sumField(astData, 'admitDays') + sumField(debtData, 'admitDays')).toLocaleString();
+    }
+
+    // --- กราฟแนวโน้มรายเดือน ---
+    function renderTrendChart(astYearData, debtYearData) {
+        const ctx = document.getElementById('trendChart');
+        if (!ctx || typeof Chart === 'undefined') return;
+
+        const astByMonth = new Array(12).fill(0);
+        const debtByMonth = new Array(12).fill(0);
+        astYearData.forEach(d => {
+            const dt = new Date(d.date);
+            if (!isNaN(dt.getTime())) astByMonth[dt.getMonth()] += Number(d.costAssist) || 0;
+        });
+        debtYearData.forEach(d => {
+            const dt = new Date(d.date);
+            if (!isNaN(dt.getTime())) debtByMonth[dt.getMonth()] += Number(d.costDebt) || 0;
+        });
+
+        if (charts.trend) charts.trend.destroy();
+        charts.trend = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: months.map(m => m.substring(0, 3)),
+                datasets: [
+                    { label: 'ยอดอนุเคราะห์ (บาท)', data: astByMonth, backgroundColor: '#0d9488' },
+                    { label: 'ยอดค้างชำระ (บาท)', data: debtByMonth, backgroundColor: '#dc2626' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } },
+                scales: { y: { beginAtZero: true, ticks: { callback: v => Number(v).toLocaleString() } } }
+            }
+        });
+    }
+
+    // --- ฟังก์ชันสร้าง Pie/Donut chart จากข้อมูลนับจำนวน ---
+    function renderPieChart(canvasId, dataObj, chartKey) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx || typeof Chart === 'undefined') return;
+
+        const entries = Object.entries(dataObj).sort((a, b) => b[1] - a[1]);
+        const palette = ['#0d9488', '#dc2626', '#2563eb', '#f59e0b', '#7c3aed', '#db2777', '#65a30d', '#0891b2'];
+
+        if (charts[chartKey]) charts[chartKey].destroy();
+
+        if (entries.length === 0) {
+            charts[chartKey] = null;
+            ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+            return;
+        }
+
+        charts[chartKey] = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: entries.map(e => e[0]),
+                datasets: [{ data: entries.map(e => e[1]), backgroundColor: palette }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } } }
+            }
+        });
+    }
+
+    // --- 4. Main Processing Function ---
+    function processSection(prefix, data, mainCostKey) {
+        const totalCases = data.length;
+
+        document.getElementById(`${prefix}-total`).innerText = totalCases.toLocaleString();
+
+        const updateCountWithPct = (id, keyword) => {
+            const count = data.filter(d => d.patientType.includes(keyword)).length;
+            const pct = getPct(count, totalCases);
+            document.getElementById(`${prefix}-${id}`).innerHTML = `${count.toLocaleString()} <span class="text-xs text-gray-400 block font-normal">(${pct})</span>`;
+        };
+
+        updateCountWithPct('new-opd', 'ใหม่ OPD');
+        updateCountWithPct('old-opd', 'เก่า OPD');
+        updateCountWithPct('new-ipd', 'ใหม่ IPD');
+        updateCountWithPct('old-ipd', 'เก่า IPD');
+
+        const sum = (key) => sumField(data, key);
+        document.getElementById(`${prefix}-admit-days`).innerText = sum('admitDays').toLocaleString();
+
+        const costFull = sum('costFull');
+        const costPay = sum('costPay');
+        const costRight = sum('costRight');
+        const costMain = sum(mainCostKey);
+
+        document.getElementById(`${prefix}-cost-full`).innerText = costFull.toLocaleString();
+        document.getElementById(`${prefix}-cost-pay`).innerText = costPay.toLocaleString();
+        document.getElementById(`${prefix}-${(prefix === 'ast' ? 'cost-assist' : 'cost-debt')}`).innerText = costMain.toLocaleString();
+        document.getElementById(`${prefix}-cost-right`).innerText = costRight.toLocaleString();
+
+        document.getElementById(`${prefix}-cost-pay-pct`).innerText = getPct(costPay, costFull);
+        document.getElementById(`${prefix}-${(prefix === 'ast' ? 'cost-assist' : 'cost-debt')}-pct`).innerText = getPct(costMain, costFull);
+        document.getElementById(`${prefix}-cost-right-pct`).innerText = getPct(costRight, costFull);
+
+        const groupBy = (key) => {
+            return data.reduce((acc, obj) => {
+                let v = obj[key] || 'ไม่ระบุ';
+                acc[v] = (acc[v] || 0) + 1;
+                return acc;
+            }, {});
+        };
+
+        renderSimpleTable(`${prefix}-table-ward`, groupBy('ward'), 5, totalCases);
+        renderSimpleTable(`${prefix}-table-icd`, groupBy('icd10'), 10, totalCases);
+        renderSimpleTable(`${prefix}-table-target`, groupBy('targetGroup'), 10, totalCases);
+
+        const natCounts = groupBy('nationality');
+        const natHtml = Object.entries(natCounts)
+            .sort((a, b) => b[1] - a[1])
+            .map(([k, v]) => {
+                let p = getPct(v, totalCases);
+                return `<span class="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs border border-gray-200">${k}: <b>${v}</b> <span class="text-gray-400">(${p})</span></span>`;
+            })
+            .join('');
+        document.getElementById(`${prefix}-tags-nation`).innerHTML = natHtml || '-';
+        renderPieChart(`${prefix}-chart-nationality`, natCounts, `${prefix}Nation`);
+
+        const addrCounts = {
+            'ในเขต อ.ดำเนินสะดวก': 0,
+            'นอกเขต อ.ดำเนินสะดวก (ใน จ.ราชบุรี)': 0,
+            'นอกจังหวัดราชบุรี': 0
+        };
+        data.forEach(d => {
+            let addr = d.address || '';
+            if (addr.includes('ดำเนินสะดวก')) {
+                addrCounts['ในเขต อ.ดำเนินสะดวก']++;
+            } else if (addr.includes('ราชบุรี')) {
+                addrCounts['นอกเขต อ.ดำเนินสะดวก (ใน จ.ราชบุรี)']++;
+            } else {
+                addrCounts['นอกจังหวัดราชบุรี']++;
+            }
+        });
+        renderSimpleTable(`${prefix}-table-address`, addrCounts, 3, totalCases);
+        renderPieChart(`${prefix}-chart-address`, addrCounts, `${prefix}Address`);
+    }
+
+    function renderSimpleTable(elementId, dataObj, limit, total) {
+        const sorted = Object.entries(dataObj).sort((a, b) => b[1] - a[1]);
+        const sliced = sorted.slice(0, limit);
+
+        let html = sliced.map(([k, v]) => {
+            let p = getPct(v, total);
+            return `
+            <tr>
+                <td class="py-2 px-2 border-b border-gray-100 text-gray-600 truncate max-w-xs">${k}</td>
+                <td class="py-2 px-2 border-b border-gray-100 text-right font-medium">${v}</td>
+                <td class="py-2 px-2 border-b border-gray-100 text-right text-xs text-gray-400">${p}</td>
+            </tr>
+            `;
+        }).join('');
+
+        if (sorted.length > limit) {
+            html += `<tr><td class="py-1 px-2 text-xs text-gray-400 italic" colspan="3">...และอื่นๆ อีก ${sorted.length - limit} รายการ</td></tr>`;
+        }
+
+        if (sliced.length === 0) html = `<tr><td colspan="3" class="text-center py-2 text-gray-300">ไม่มีข้อมูล</td></tr>`;
+
+        document.getElementById(elementId).innerHTML = html;
+    }
+
+    // --- Export CSV ---
+    function toCsvRow(arr) {
+        return arr.map(v => {
+            const s = (v === null || v === undefined) ? '' : String(v);
+            return '"' + s.replace(/"/g, '""') + '"';
+        }).join(',');
+    }
+
+    function exportCSV() {
+        const headers = ['ประเภท', 'วันที่', 'ประเภทผู้ป่วย', 'กลุ่มเป้าหมาย', 'สัญชาติ', 'ที่อยู่', 'ค่ารักษาเต็ม', 'ชำระเอง', 'สงเคราะห์', 'สิทธิอื่น', 'ค้างชำระ', 'วันนอน', 'ICD10', 'ห้องตรวจ/หอผู้ป่วย'];
+        const rows = [toCsvRow(headers)];
+
+        const pushRows = (arr, label) => {
+            arr.forEach(d => {
+                const dt = new Date(d.date);
+                const dateStr = isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('th-TH');
+                rows.push(toCsvRow([
+                    label, dateStr, d.patientType, d.targetGroup, d.nationality, d.address,
+                    d.costFull, d.costPay, d.costAssist || 0, d.costRight, d.costDebt || 0, d.admitDays, d.icd10, d.ward
+                ]));
+            });
+        };
+        pushRows(rawData.assistance || [], 'อนุเคราะห์');
+        pushRows(rawData.debt || [], 'ค้างชำระ');
+
+        // เติม BOM (\uFEFF) เพื่อให้ Excel เปิดภาษาไทยได้ถูกต้อง
+        const csvContent = '\uFEFF' + rows.join('\r\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const selectedYear = ySelect.value;
+        const selectedMonth = mSelect.value;
+        const yLabel = selectedYear === 'all' ? 'all' : (parseInt(selectedYear) + 543);
+        const mLabel = selectedMonth === 'all' ? 'all' : months[selectedMonth];
+        a.href = url;
+        a.download = `dashboard_${yLabel}_${mLabel}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // Start
+    loadData();
+  </script>
+</body>
+</html>
