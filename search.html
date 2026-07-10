@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ค้นหาข้อมูลการอนุเคราะห์ - ค้างชำระ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Sarabun', sans-serif; background-color: #f3f4f6; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+    .filter-chip { cursor: pointer; user-select: none; transition: all .15s; }
+    .filter-chip.active { box-shadow: inset 0 0 0 2px currentColor; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <nav class="bg-teal-700 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center gap-3">
+           <a href="index.html" class="hover:bg-teal-800 p-2 rounded-full transition">
+             <i class="fas fa-arrow-left text-lg"></i>
+           </a>
+           <h1 class="text-lg font-bold">ระบบค้นหาข้อมูล</h1>
+        </div>
+        <div class="flex gap-2">
+            <a href="index.html" class="bg-teal-800 hover:bg-teal-900 px-3 py-1 rounded text-sm">บันทึกข้อมูล</a>
+            <a href="dashboard.html" class="bg-teal-800 hover:bg-teal-900 px-3 py-1 rounded text-sm">Dashboard</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="bg-white shadow-sm border-b py-8 px-4">
+    <div class="max-w-3xl mx-auto text-center">
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">ค้นหาประวัติการใช้บริการ</h2>
+      <p class="text-gray-500 mb-6">ระบุ HN, AN หรือ ชื่อ-นามสกุล เพื่อค้นหา</p>
+
+      <form onsubmit="handleSearch(event)" class="relative">
+         <input type="text" id="searchInput"
+                class="w-full pl-12 pr-4 py-4 rounded-full border-2 border-teal-100 focus:border-teal-500 focus:ring-0 shadow-sm text-lg transition outline-none"
+                placeholder="พิมพ์ HN, AN หรือชื่อ... เช่น 12345, สมชาย" required>
+         <i class="fas fa-search absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400 text-xl"></i>
+         <button type="submit" id="btnSearch" class="absolute right-2 top-2 bottom-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 rounded-full font-medium transition">
+           ค้นหา
+         </button>
+      </form>
+
+      <!-- ตัวกรองผลลัพธ์ -->
+      <div id="filterBar" class="hidden mt-5 flex flex-wrap items-center justify-center gap-2">
+        <span class="filter-chip active bg-gray-100 text-gray-700 px-3 py-1.5 rounded-full text-sm font-medium border border-gray-200" data-type="all" onclick="setTypeFilter('all', this)">ทั้งหมด</span>
+        <span class="filter-chip bg-teal-50 text-teal-700 px-3 py-1.5 rounded-full text-sm font-medium border border-teal-200" data-type="อนุเคราะห์" onclick="setTypeFilter('อนุเคราะห์', this)">อนุเคราะห์</span>
+        <span class="filter-chip bg-red-50 text-red-700 px-3 py-1.5 rounded-full text-sm font-medium border border-red-200" data-type="ค้างชำระ" onclick="setTypeFilter('ค้างชำระ', this)">ค้างชำระ</span>
+        <div class="flex items-center gap-1 ml-2">
+          <label class="text-xs text-gray-400">ตั้งแต่</label>
+          <input type="date" id="dateFrom" class="border-gray-200 rounded text-xs px-2 py-1" onchange="applyFilters()">
+          <label class="text-xs text-gray-400">ถึง</label>
+          <input type="date" id="dateTo" class="border-gray-200 rounded text-xs px-2 py-1" onchange="applyFilters()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex-grow max-w-5xl mx-auto w-full px-4 py-8">
+
+      <div id="loading" class="hidden text-center py-12">
+         <i class="fas fa-circle-notch fa-spin text-4xl text-teal-600 mb-3"></i>
+         <p class="text-gray-500">กำลังค้นหาข้อมูลจากฐานข้อมูล...</p>
+      </div>
+
+      <div id="noResult" class="hidden text-center py-12 bg-white rounded-xl border border-gray-200 shadow-sm">
+         <i class="fas fa-folder-open text-gray-300 text-6xl mb-4"></i>
+         <p class="text-xl text-gray-600 font-medium">ไม่พบข้อมูลที่ค้นหา</p>
+         <p class="text-gray-400">กรุณาตรวจสอบ HN, AN หรือตัวสะกดอีกครั้ง</p>
+      </div>
+
+      <div id="resultCount" class="hidden mb-4 text-gray-600 font-medium ml-1">
+         พบข้อมูลทั้งหมด <span id="countNum" class="text-teal-700 font-bold">0</span> รายการ
+      </div>
+
+      <div id="resultList" class="space-y-4"></div>
+
+      <div id="loadMoreWrap" class="hidden text-center mt-6">
+        <button onclick="showMore()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-full font-medium shadow-sm transition">
+          แสดงเพิ่มเติม <span id="remainCount" class="text-gray-400"></span>
+        </button>
+      </div>
+
+  </div>
+
+  <script>
+    // ==========================================================================
+    // API_URL: URL ของ Google Apps Script Web App (ลงท้ายด้วย /exec)
+    // ==========================================================================
+    const API_URL = "https://script.google.com/macros/s/AKfycbwsI_1502NZihQnQ_c27ngyqThk0S2jbnX4rKUCnHTimjsyulZ5et2lmqp0E2IGVGFg/exec"; // TODO: แก้เป็น URL จริง
+
+    async function apiGet(action, params) {
+      const usp = new URLSearchParams(Object.assign({ action }, params || {}));
+      const res = await fetch(`${API_URL}?${usp.toString()}`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || 'เกิดข้อผิดพลาดจาก API');
+      return json.data;
+    }
+
+    // --- HTML escape: ป้องกัน Stored XSS จากข้อมูลที่ผู้ใช้เคยกรอกไว้ (เช่น ชื่อ, หมายเหตุ) ---
+    function esc(v) {
+      return String(v ?? '').replace(/[&<>"']/g, function(c) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+      });
+    }
+
+    function fmtNum(v) {
+      var n = Number(v);
+      return isNaN(n) ? '0' : n.toLocaleString();
+    }
+
+    let allResults = [];   // ผลลัพธ์ดิบทั้งหมดจาก server
+    let filteredResults = []; // หลังผ่านตัวกรอง (ประเภท/ช่วงวันที่)
+    let typeFilter = 'all';
+    const PAGE_SIZE = 10;
+    let shownCount = PAGE_SIZE;
+
+    async function handleSearch(e) {
+      e.preventDefault();
+      const query = document.getElementById('searchInput').value;
+      if (!query) return;
+
+      const btn = document.getElementById('btnSearch');
+      btn.disabled = true; // กันกดค้นหาซ้ำซ้อนระหว่างรอผล
+
+      // Reset UI
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('resultList').innerHTML = '';
+      document.getElementById('noResult').classList.add('hidden');
+      document.getElementById('resultCount').classList.add('hidden');
+      document.getElementById('filterBar').classList.add('hidden');
+      document.getElementById('loadMoreWrap').classList.add('hidden');
+      document.getElementById('searchInput').blur(); // hide keyboard on mobile
+
+      try {
+        const data = await apiGet('search', { query });
+        btn.disabled = false;
+        onResults(data);
+      } catch (err) {
+        btn.disabled = false;
+        document.getElementById('loading').classList.add('hidden');
+        alert("เกิดข้อผิดพลาด: " + err.message);
+      }
+    }
+
+    function onResults(data) {
+      document.getElementById('loading').classList.add('hidden');
+
+      allResults = Array.isArray(data) ? data.slice() : [];
+      // เรียงล่าสุดก่อนเสมอ (ใช้ rawDate ที่ server ส่งมา)
+      allResults.sort((a, b) => (b.rawDate || 0) - (a.rawDate || 0));
+
+      if (allResults.length === 0) {
+        document.getElementById('noResult').classList.remove('hidden');
+        return;
+      }
+
+      typeFilter = 'all';
+      shownCount = PAGE_SIZE;
+      document.getElementById('filterBar').classList.remove('hidden');
+      document.getElementById('dateFrom').value = '';
+      document.getElementById('dateTo').value = '';
+      // reset chip state
+      document.querySelectorAll('.filter-chip').forEach(el => el.classList.remove('active'));
+      document.querySelector('.filter-chip[data-type="all"]').classList.add('active');
+
+      applyFilters();
+    }
+
+    function setTypeFilter(type, el) {
+      typeFilter = type;
+      shownCount = PAGE_SIZE;
+      document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const fromVal = document.getElementById('dateFrom').value;
+      const toVal = document.getElementById('dateTo').value;
+      const fromTs = fromVal ? new Date(fromVal).setHours(0, 0, 0, 0) : null;
+      const toTs = toVal ? new Date(toVal).setHours(23, 59, 59, 999) : null;
+
+      filteredResults = allResults.filter(item => {
+        if (typeFilter !== 'all' && item.serviceType !== typeFilter) return false;
+        if (fromTs !== null && (item.rawDate || 0) < fromTs) return false;
+        if (toTs !== null && (item.rawDate || 0) > toTs) return false;
+        return true;
+      });
+
+      shownCount = PAGE_SIZE;
+      renderResults();
+    }
+
+    function showMore() {
+      shownCount += PAGE_SIZE;
+      renderResults();
+    }
+
+    function renderResults() {
+      const container = document.getElementById('resultList');
+      container.innerHTML = '';
+
+      if (filteredResults.length === 0) {
+        document.getElementById('resultCount').classList.add('hidden');
+        document.getElementById('loadMoreWrap').classList.add('hidden');
+        document.getElementById('noResult').classList.remove('hidden');
+        return;
+      }
+
+      document.getElementById('noResult').classList.add('hidden');
+      document.getElementById('resultCount').classList.remove('hidden');
+      document.getElementById('countNum').innerText = filteredResults.length;
+
+      const toShow = filteredResults.slice(0, shownCount);
+
+      toShow.forEach(item => {
+         const isAssist = item.serviceType === 'อนุเคราะห์';
+         const themeColor = isAssist ? 'teal' : 'red';
+         const badgeBg = isAssist ? 'bg-teal-100 text-teal-800' : 'bg-red-100 text-red-800';
+         const borderClass = isAssist ? 'border-l-4 border-teal-500' : 'border-l-4 border-red-500';
+
+         const card = document.createElement('div');
+         card.className = `bg-white p-6 rounded-xl shadow-sm border border-gray-100 card-hover transition duration-200 ${borderClass}`;
+
+         card.innerHTML = `
+           <div class="flex flex-col md:flex-row justify-between md:items-start gap-4 mb-4 border-b pb-4 border-gray-100">
+              <div>
+                 <div class="flex items-center gap-2 mb-1">
+                    <span class="${badgeBg} px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide border border-opacity-20 border-current">${esc(item.serviceType)}</span>
+                    <span class="text-gray-400 text-xs"><i class="far fa-calendar-alt mr-1"></i>${esc(item.date)}</span>
+                 </div>
+                 <h3 class="text-xl font-bold text-gray-800">${esc(item.name)} <span class="text-sm font-normal text-gray-500 ml-2">(อายุ ${esc(item.age)} ปี)</span></h3>
+                 <div class="flex flex-wrap gap-x-4 text-sm text-gray-600 mt-1">
+                    <span><b class="text-gray-900">HN:</b> ${esc(item.hn)}</span>
+                    ${item.an && item.an !== '-' ? `<span><b class="text-gray-900">AN:</b> ${esc(item.an)}</span>` : ''}
+                    <span><b class="text-gray-900">ประเภท:</b> ${esc(item.patientType)}</span>
+                 </div>
+              </div>
+              <div class="text-right md:text-right">
+                  <div class="text-sm text-gray-500">ยอด${esc(item.serviceType)}</div>
+                  <div class="text-2xl font-bold text-${themeColor}-600">${fmtNum(item.costMain)}</div>
+                  <div class="text-xs text-gray-400">บาท</div>
+              </div>
+           </div>
+
+           <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              <div class="flex justify-between border-b border-gray-50 py-1">
+                 <span class="text-gray-500">ค่ารักษาเต็มจำนวน</span>
+                 <span class="font-medium">${fmtNum(item.costFull)}</span>
+              </div>
+              <div class="flex justify-between border-b border-gray-50 py-1">
+                 <span class="text-gray-500">ชำระเอง</span>
+                 <span class="font-medium">${fmtNum(item.costPay)}</span>
+              </div>
+              <div class="flex justify-between border-b border-gray-50 py-1">
+                 <span class="text-gray-500">เบิกสิทธิอื่น</span>
+                 <span class="font-medium">${fmtNum(item.costRight)}</span>
+              </div>
+              <div class="flex justify-between border-b border-gray-50 py-1">
+                 <span class="text-gray-500">กลุ่มเป้าหมาย</span>
+                 <span class="font-medium">${esc(item.targetGroup)}</span>
+              </div>
+              <div class="flex justify-between border-b border-gray-50 py-1 col-span-1 md:col-span-2">
+                 <span class="text-gray-500">โรค (ICD10)</span>
+                 <span class="font-medium text-gray-800">${esc(item.icd10) || '-'}</span>
+              </div>
+              <div class="flex justify-between border-b border-gray-50 py-1 col-span-1 md:col-span-2">
+                 <span class="text-gray-500">ห้องตรวจ/หอผู้ป่วย</span>
+                 <span class="font-medium text-gray-800">${esc(item.ward) || '-'}</span>
+              </div>
+              ${item.note ? `
+              <div class="flex flex-col border-b border-gray-50 py-1 col-span-1 md:col-span-2 mt-2">
+                 <span class="text-gray-500 text-xs mb-1">หมายเหตุ</span>
+                 <span class="font-medium text-gray-800 bg-gray-50 p-2 rounded text-sm">${esc(item.note)}</span>
+              </div>
+              ` : ''}
+           </div>
+
+           <div class="mt-3 text-xs text-gray-400 text-right">
+              <i class="fas fa-database mr-1"></i> ข้อมูลจาก: ${esc(item.sheetName)}
+           </div>
+         `;
+
+         container.appendChild(card);
+      });
+
+      const remaining = filteredResults.length - toShow.length;
+      const loadMoreWrap = document.getElementById('loadMoreWrap');
+      if (remaining > 0) {
+        document.getElementById('remainCount').innerText = `(เหลืออีก ${remaining} รายการ)`;
+        loadMoreWrap.classList.remove('hidden');
+      } else {
+        loadMoreWrap.classList.add('hidden');
+      }
+    }
+  </script>
+</body>
+</html>
