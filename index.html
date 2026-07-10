@@ -1,31 +1,685 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบบันทึกผู้ใช้บริการสงเคราะห์ รพ.ดำเนินสะดวก</title> <link rel="icon" type="image/png" href="https://img2.pic.in.th/Logo-sw.png">
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            overflow: hidden; /* ซ่อน Scrollbar ของหน้าหลัก */
-        }
-        iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบบันทึกผู้ใช้บริการสงเคราะห์</title><link rel="icon" type="image/png" href="https://img2.pic.in.th/Logo-sw.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Sarabun', sans-serif; background-color: #f3f4f6; }
+    .hidden-field { display: none !important; }
+  </style>
 </head>
-<body>
+<body class="bg-gray-50 min-h-screen">
 
-    <iframe src="https://script.google.com/macros/s/AKfycbwsI_1502NZihQnQ_c27ngyqThk0S2jbnX4rKUCnHTimjsyulZ5et2lmqp0E2IGVGFg/exec">
-        เบราว์เซอร์ของคุณไม่รองรับการแสดงผล iframe
-    </iframe>
+  <nav class="bg-teal-700 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-20">
+        <div class="flex items-center gap-4">
+          <img src="https://img2.pic.in.th/Logo-sw6944b6d81ee7918a02.png" alt="Logo" class="h-12 w-12 rounded-full bg-white p-1">
+          <div>
+            <h1 class="text-xl font-bold">ระบบบันทึกผู้ใช้บริการสงเคราะห์ (อนุเคราะห์/ค้างชำระค่ารักษา)</h1>
+            <p class="text-sm text-teal-100">กลุ่มงานสังคมสงเคราะห์ โรงพยาบาลสมเด็จพระสังฆราช (อมฺพรมหาเถร)</p>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <a href="search.html" class="bg-teal-600 hover:bg-teal-500 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow border border-teal-500">
+          <i class="fas fa-search"></i> ค้นหาประวัติ
+          </a>
+          <a href="dashboard.html" class="bg-teal-800 hover:bg-teal-900 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow">
+          <i class="fas fa-chart-line"></i> Dashboard
+          </a>
+        </div>
+      </div>
+    </div>
+  </nav>
 
+  <div class="max-w-4xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+    <form id="recordForm" class="bg-white shadow-xl rounded-lg overflow-hidden border border-gray-200">
+
+      <div class="bg-teal-50 px-6 py-4 border-b border-teal-100">
+        <h2 class="text-lg font-semibold text-teal-800">บันทึกข้อมูลผู้ใช้บริการ</h2>
+      </div>
+
+      <div class="p-6 space-y-6">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">ประเภทบริการ</label>
+            <select id="serviceType" name="serviceType" class="w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 border" required>
+              <option value="อนุเคราะห์">อนุเคราะห์</option>
+              <option value="ค้างชำระ">ค้างชำระ</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">วันที่ใช้บริการ</label>
+            <input type="date" id="serviceDate" name="serviceDate" class="w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 border" required>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">ประเภทผู้ป่วย</label>
+            <select id="patientType" name="patientType" class="w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 border" required onchange="toggleIPDFields()">
+              <option value="ผู้ป่วยใหม่ OPD">ผู้ป่วยใหม่ OPD</option>
+              <option value="ผู้ป่วยเก่า OPD">ผู้ป่วยเก่า OPD</option>
+              <option value="ผู้ป่วยใหม่ IPD">ผู้ป่วยใหม่ IPD</option>
+              <option value="ผู้ป่วยเก่า IPD">ผู้ป่วยเก่า IPD</option>
+            </select>
+          </div>
+          <div>
+             <label class="block text-sm font-medium text-gray-700 mb-2">HN</label>
+             <input type="text" name="hn" class="w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 border" required>
+          </div>
+        </div>
+
+        <div id="ipdFields" class="hidden-field grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50 p-4 rounded-md mt-4 border border-blue-100">
+           <div>
+             <label class="block text-sm font-medium text-blue-800 mb-2">AN (เฉพาะ IPD)</label>
+             <input type="text" id="inputAN" name="an" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" placeholder="ระบุเลข AN">
+           </div>
+           <div>
+             <label class="block text-sm font-medium text-blue-800 mb-2">จำนวนวันนอน</label>
+             <input type="number" id="inputAdmitDays" name="admitDays" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" placeholder="ระบุจำนวนวัน">
+           </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+           <div class="md:col-span-6">
+             <label class="block text-sm font-medium text-gray-700 mb-2">ชื่อ - นามสกุล</label>
+             <input type="text" name="fullName" class="w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 border" required>
+           </div>
+           <div class="md:col-span-2">
+             <label class="block text-sm font-medium text-gray-700 mb-2">อายุ (ปี)</label>
+             <input type="number" name="age" class="w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 border" required>
+           </div>
+           <div class="md:col-span-4">
+             <label class="block text-sm font-medium text-gray-700 mb-2">กลุ่มเป้าหมาย</label>
+             <select name="targetGroup" class="w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 border">
+               <option value="เด็ก (อายุ 0-12 ปี)">เด็ก (อายุ 0-12 ปี)</option>
+               <option value="อายุ 13-59 ปี">อายุ 13-59 ปี</option>
+               <option value="ผู้สูงอายุ (60 ปีขึ้นไป)">ผู้สูงอายุ (60 ปีขึ้นไป)</option>
+             </select>
+           </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">สัญชาติ</label>
+          <div class="flex gap-4">
+             <select id="nationality" name="nationality" class="w-1/2 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 border" onchange="checkNationality()">
+               <option value="ไทย">ไทย</option>
+               <option value="เมียนมา">เมียนมา</option>
+               <option value="ลาว">ลาว</option>
+               <option value="กัมพูชา">กัมพูชา</option>
+               <option value="อื่นๆ">อื่นๆ</option>
+             </select>
+             <input type="text" id="nationalityOther" name="nationalityOther" placeholder="ระบุ" class="w-1/2 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 border hidden-field">
+          </div>
+        </div>
+
+        <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
+           <label class="block text-sm font-bold text-gray-700 mb-3">ที่อยู่ปัจจุบัน</label>
+           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label class="text-xs">จังหวัด</label>
+                <select id="province" class="w-full p-2 border rounded text-sm" onchange="loadDistricts()"></select>
+              </div>
+              <div>
+                <label class="text-xs">อำเภอ</label>
+                <select id="district" class="w-full p-2 border rounded text-sm" onchange="loadSubDistricts()"></select>
+              </div>
+              <div>
+                <label class="text-xs">ตำบล</label>
+                <select id="subDistrict" class="w-full p-2 border rounded text-sm"></select>
+              </div>
+           </div>
+           <input type="hidden" name="fullAddress" id="fullAddress">
+        </div>
+
+        <div class="border-t pt-4">
+           <h3 class="text-md font-semibold text-gray-800 mb-4">ข้อมูลค่ารักษาและโรค</h3>
+
+           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-2">
+             <div>
+               <label class="text-xs text-gray-600">ค่ารักษา (จำนวนเต็ม)</label>
+               <input type="number" step="0.01" name="costFull" class="w-full p-2 border rounded bg-gray-50" required>
+             </div>
+             <div>
+               <label class="text-xs text-gray-600">ชำระเอง</label>
+               <input type="number" step="0.01" name="costPay" class="w-full p-2 border rounded" value="0">
+             </div>
+
+             <div class="assist-field">
+               <label class="text-xs text-teal-600 font-bold">ยอดสงเคราะห์</label>
+               <input type="number" step="0.01" name="costAssist" class="w-full p-2 border rounded border-teal-300 bg-teal-50" value="0">
+             </div>
+
+             <div class="debt-field hidden-field">
+               <label class="text-xs text-red-600 font-bold">ยอดค้างชำระ</label>
+               <input type="number" step="0.01" name="costDebt" class="w-full p-2 border rounded border-red-300 bg-red-50" value="0">
+             </div>
+
+             <div>
+               <label class="text-xs text-gray-600">สิทธิอื่น</label>
+               <input type="number" step="0.01" name="costRight" class="w-full p-2 border rounded" value="0">
+             </div>
+           </div>
+
+           <!-- แสดงผลตรวจสอบยอดเงินแบบ real-time: ค่ารักษาเต็ม ควรเท่ากับ ชำระเอง+สงเคราะห์/ค้างชำระ+สิทธิอื่น -->
+           <div id="costCheckMsg" class="mb-4 text-xs font-medium"></div>
+
+           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">โรค (ICD10)</label>
+                <input type="text" name="icd10" class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
+              </div>
+              <div>
+  <label class="block text-sm font-medium text-gray-700 mb-2">ห้องตรวจ / หอผู้ป่วย</label>
+  <div class="flex gap-4">
+    <select id="ward" name="ward" class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 border" onchange="checkWard()">
+      <option value="-">- เลือก -</option>
+      <option value="OPD">OPD</option>
+      <option value="ER">ER</option>
+      <option value="อายุรกรรมชาย">อายุรกรรมชาย</option>
+      <option value="อายุรกรรมหญิง">อายุรกรรมหญิง</option>
+      <option value="ศัลยกรรม">ศัลยกรรม</option>
+      <option value="ศัลยกรรมกระดูก">ศัลยกรรมกระดูก</option>
+      <option value="กุมารเวชกรรม">กุมารเวชกรรม</option>
+      <option value="สูตินรีเวชกรรม">สูตินรีเวชกรรม</option>
+      <option value="HIV">HIV</option>
+      <option value="จิตเวช">จิตเวช</option>
+      <option value="จักษุ">จักษุ</option>
+      <option value="Stroke">Stroke</option>
+      <option value="ICU">ICU</option>
+      <option value="อื่นๆ">อื่นๆ</option>
+    </select>
+
+    <input type="text" id="wardOther" name="wardOther" placeholder="ระบุตึก/ห้อง" class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 border hidden-field">
+  </div>
+</div>
+           </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">ปัญหา</label>
+            <textarea name="problem" class="w-full rounded-md border-gray-300 shadow-sm p-2 border" rows="2"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">หมายเหตุ</label>
+            <textarea name="note" class="w-full rounded-md border-gray-300 shadow-sm p-2 border" rows="2"></textarea>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="bg-gray-50 px-6 py-4 flex justify-end gap-4">
+        <button type="button" onclick="handleClearForm()" class="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">ล้างข้อมูล</button>
+        <button type="submit" id="btnSubmit" class="px-6 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 shadow-md font-medium">บันทึกข้อมูล</button>
+      </div>
+
+    </form>
+  </div>
+
+  <script>
+    // ==========================================================================
+    // API_URL: URL ของ Google Apps Script Web App (ลงท้ายด้วย /exec)
+    // ได้จาก Deploy > New deployment > Web app หลัง deploy Code.gs เวอร์ชัน API
+    // ==========================================================================
+    const API_URL = "https://script.google.com/macros/s/AKfycbwsI_1502NZihQnQ_c27ngyqThk0S2jbnX4rKUCnHTimjsyulZ5et2lmqp0E2IGVGFg/exec"; // TODO: แก้เป็น URL จริง
+
+    // เรียกข้อมูล (อ่าน) ด้วย GET - ไม่ trigger CORS preflight
+    async function apiGet(action, params) {
+      const usp = new URLSearchParams(Object.assign({ action }, params || {}));
+      const res = await fetch(`${API_URL}?${usp.toString()}`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || 'เกิดข้อผิดพลาดจาก API');
+      return json.data;
+    }
+
+    // ส่งข้อมูล (เขียน) ด้วย POST - ใช้ Content-Type: text/plain เพื่อเลี่ยง CORS preflight
+    // ที่ Apps Script ตอบ OPTIONS ไม่ได้
+    async function apiPost(action, data) {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, data })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json(); // { success, message }
+    }
+
+    // --- Data URL ---
+    const API_PROVINCE = "https://raw.githubusercontent.com/kongvut/thai-province-data/master/api/latest/province.json";
+    const API_DISTRICT = "https://raw.githubusercontent.com/kongvut/thai-province-data/master/api/latest/district.json";
+    const API_SUBDISTRICT = "https://raw.githubusercontent.com/kongvut/thai-province-data/master/api/latest/sub_district.json";
+
+    let provinces = [], districts = [], subDistricts = [];
+
+    // --- Cache ข้อมูลที่อยู่ไว้ใน localStorage กันโหลดไฟล์ใหญ่ซ้ำทุกครั้งที่เปิดหน้า ---
+    const ADDR_CACHE_KEY = 'thAddressCacheV1';
+    const ADDR_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 วัน
+
+    function loadAddressCache() {
+      try {
+        const raw = localStorage.getItem(ADDR_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed.savedAt || (Date.now() - parsed.savedAt) > ADDR_CACHE_TTL) return null;
+        if (!parsed.provinces || !parsed.districts || !parsed.subDistricts) return null;
+        return parsed;
+      } catch (e) { return null; }
+    }
+
+    function saveAddressCache(obj) {
+      try {
+        localStorage.setItem(ADDR_CACHE_KEY, JSON.stringify(Object.assign({ savedAt: Date.now() }, obj)));
+      } catch (e) { /* localStorage อาจเต็มหรือถูกปิดใช้งาน - ข้ามไปเงียบๆ */ }
+    }
+
+    // --- On Load ---
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Set Default Date
+      document.getElementById('serviceDate').valueAsDate = new Date();
+
+      // Load Address Data
+      await fetchAddressData();
+
+      // Check initial IPD State (เผื่อ Browser จำค่าเดิมหลัง Refresh)
+      toggleIPDFields();
+
+      // ตรวจสอบยอดเงินเริ่มต้น + ผูก event สำหรับตรวจสอบ real-time
+      checkCostSum();
+      ['costFull', 'costPay', 'costAssist', 'costDebt', 'costRight'].forEach(n => {
+        const el = document.querySelector(`[name="${n}"]`);
+        if (el) el.addEventListener('input', checkCostSum);
+      });
+
+      // เสนอกู้คืนร่างที่กรอกค้างไว้ (ถ้ามี)
+      restoreDraftIfAny();
+
+      // บันทึกร่างอัตโนมัติทุกครั้งที่มีการแก้ไขในฟอร์ม
+      const form = document.getElementById('recordForm');
+      form.addEventListener('input', saveDraft);
+      form.addEventListener('change', saveDraft);
+    });
+
+    // --- Logic Functions ---
+
+    // ฟังก์ชันจัดการแสดงผลช่อง IPD
+    function toggleIPDFields() {
+      const type = document.getElementById('patientType').value;
+      const ipdFields = document.getElementById('ipdFields');
+      const inputAN = document.getElementById('inputAN');
+      const inputAdmitDays = document.getElementById('inputAdmitDays');
+
+      // ตรวจสอบว่ามีคำว่า "IPD" ในตัวเลือกหรือไม่
+      if (type.includes('IPD')) {
+        // แสดงช่องกรอก
+        ipdFields.classList.remove('hidden-field');
+        // บังคับกรอก AN (ถ้าต้องการ)
+        // inputAN.required = true;
+      } else {
+        // ซ่อนช่องกรอก
+        ipdFields.classList.add('hidden-field');
+
+        // ล้างข้อมูลเพื่อป้องกันความผิดพลาด
+        inputAN.value = '';
+        inputAdmitDays.value = '';
+        // ยกเลิกบังคับกรอก
+        // inputAN.required = false;
+      }
+    }
+
+    function checkNationality() {
+      const nat = document.getElementById('nationality').value;
+      const other = document.getElementById('nationalityOther');
+      if (nat === 'อื่นๆ') {
+        other.classList.remove('hidden-field');
+        other.required = true;
+      } else {
+        other.classList.add('hidden-field');
+        other.required = false;
+      }
+    }
+
+    // Toggle Cost Fields based on Service Type
+    document.getElementById('serviceType').addEventListener('change', function() {
+       const val = this.value;
+       const assistFields = document.querySelectorAll('.assist-field');
+       const debtFields = document.querySelectorAll('.debt-field');
+
+       if (val === 'อนุเคราะห์') {
+         assistFields.forEach(el => el.classList.remove('hidden-field'));
+         debtFields.forEach(el => el.classList.add('hidden-field'));
+       } else {
+         assistFields.forEach(el => el.classList.add('hidden-field'));
+         debtFields.forEach(el => el.classList.remove('hidden-field'));
+       }
+       checkCostSum();
+    });
+
+    // --- ตรวจสอบยอดเงินให้ตรงกัน (real-time) ---
+    // ค่ารักษาเต็ม ควรเท่ากับ ชำระเอง + (สงเคราะห์ หรือ ค้างชำระ) + สิทธิอื่น
+    function getCostInputs() {
+      return {
+        full: parseFloat(document.querySelector('[name="costFull"]').value) || 0,
+        pay: parseFloat(document.querySelector('[name="costPay"]').value) || 0,
+        assist: parseFloat(document.querySelector('[name="costAssist"]').value) || 0,
+        debt: parseFloat(document.querySelector('[name="costDebt"]').value) || 0,
+        right: parseFloat(document.querySelector('[name="costRight"]').value) || 0,
+      };
+    }
+
+    function checkCostSum() {
+      const c = getCostInputs();
+      const serviceType = document.getElementById('serviceType').value;
+      const main = serviceType === 'อนุเคราะห์' ? c.assist : c.debt;
+      const sum = c.pay + main + c.right;
+      const diff = Math.round((c.full - sum) * 100) / 100;
+      const msgEl = document.getElementById('costCheckMsg');
+      if (!msgEl) return true;
+
+      if (Math.abs(diff) <= 1) {
+        msgEl.className = 'mb-4 text-xs font-medium text-green-600';
+        msgEl.innerHTML = `<i class="fas fa-check-circle mr-1"></i> ยอดรวมตรงกัน (รวม ${sum.toLocaleString()} บาท)`;
+        return true;
+      } else {
+        msgEl.className = 'mb-4 text-xs font-medium text-red-600';
+        msgEl.innerHTML = `<i class="fas fa-exclamation-triangle mr-1"></i> ยอดไม่ตรงกัน: ค่ารักษาเต็ม ${c.full.toLocaleString()} บาท แต่ผลรวม ชำระเอง+${serviceType === 'อนุเคราะห์' ? 'สงเคราะห์' : 'ค้างชำระ'}+สิทธิอื่น = ${sum.toLocaleString()} บาท (ต่างกัน ${Math.abs(diff).toLocaleString()} บาท)`;
+        return false;
+      }
+    }
+
+    // --- Address Logic ---
+    async function fetchAddressData() {
+      try {
+        const cached = loadAddressCache();
+        if (cached) {
+          provinces = cached.provinces;
+          districts = cached.districts;
+          subDistricts = cached.subDistricts;
+          setupAddressDropdowns();
+          return;
+        }
+
+        const [pRes, dRes, sRes] = await Promise.all([
+           fetch(API_PROVINCE), fetch(API_DISTRICT), fetch(API_SUBDISTRICT)
+        ]);
+        provinces = await pRes.json();
+        districts = await dRes.json();
+        subDistricts = await sRes.json();
+
+        saveAddressCache({ provinces, districts, subDistricts });
+        setupAddressDropdowns();
+      } catch (err) {
+        console.error("Error loading address", err);
+        Swal.fire("Error", "ไม่สามารถโหลดข้อมูลที่อยู่ได้", "error");
+      }
+    }
+
+    function setupAddressDropdowns() {
+       const pSelect = document.getElementById('province');
+       pSelect.innerHTML = '';
+
+       // Populate Provinces
+       provinces.forEach(p => {
+         const opt = document.createElement('option');
+         opt.value = p.id;
+         opt.text = p.name_th;
+         pSelect.appendChild(opt);
+       });
+
+       // Set Default Ratchaburi
+       const ratchaburi = provinces.find(p => p.name_th.includes('ราชบุรี'));
+       if (ratchaburi) pSelect.value = ratchaburi.id;
+
+       loadDistricts();
+    }
+
+    function loadDistricts() {
+       const pId = parseInt(document.getElementById('province').value);
+       const dSelect = document.getElementById('district');
+       dSelect.innerHTML = '';
+
+       const filteredDistricts = districts.filter(d => d.province_id === pId);
+       filteredDistricts.forEach(d => {
+         const opt = document.createElement('option');
+         opt.value = d.id;
+         opt.text = d.name_th;
+         dSelect.appendChild(opt);
+       });
+
+       // Set Default Damnoen Saduak
+       const ratchaburi = provinces.find(p => p.name_th.includes('ราชบุรี'));
+       if (pId === ratchaburi?.id) {
+          const damnoen = filteredDistricts.find(d => d.name_th.includes('ดำเนินสะดวก'));
+          if (damnoen) dSelect.value = damnoen.id;
+       }
+
+       loadSubDistricts();
+    }
+
+    function loadSubDistricts() {
+       const dId = parseInt(document.getElementById('district').value);
+       const sSelect = document.getElementById('subDistrict');
+       sSelect.innerHTML = '';
+
+       const filteredSub = subDistricts.filter(s => s.district_id === dId);
+       filteredSub.forEach(s => {
+         const opt = document.createElement('option');
+         opt.value = s.id;
+         opt.text = s.name_th;
+         sSelect.appendChild(opt);
+       });
+    }
+
+    // --- ร่างฟอร์ม (Draft) บันทึกลง localStorage อัตโนมัติ กันข้อมูลหายถ้าหลุด session ---
+    const DRAFT_KEY = 'formDraftV1';
+    const DRAFT_MAX_AGE = 3 * 24 * 60 * 60 * 1000; // 3 วัน
+    let draftSaveTimer = null;
+
+    function collectFormDraft() {
+      const form = document.getElementById('recordForm');
+      const data = {};
+      Array.from(form.elements).forEach(el => {
+        if (!el.name || el.type === 'submit' || el.type === 'reset') return;
+        data[el.name] = el.value;
+      });
+      data._province = document.getElementById('province').value;
+      data._district = document.getElementById('district').value;
+      data._subDistrict = document.getElementById('subDistrict').value;
+      return data;
+    }
+
+    function saveDraft() {
+      clearTimeout(draftSaveTimer);
+      draftSaveTimer = setTimeout(() => {
+        try {
+          localStorage.setItem(DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), data: collectFormDraft() }));
+        } catch (e) { /* เพิกเฉยถ้าบันทึกไม่ได้ */ }
+      }, 500);
+    }
+
+    function clearDraft() {
+      try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+    }
+
+    function restoreDraftIfAny() {
+      let raw;
+      try { raw = localStorage.getItem(DRAFT_KEY); } catch (e) { return; }
+      if (!raw) return;
+
+      let parsed;
+      try { parsed = JSON.parse(raw); } catch (e) { return; }
+      if (!parsed || !parsed.data) return;
+
+      if (Date.now() - (parsed.savedAt || 0) > DRAFT_MAX_AGE) {
+        clearDraft();
+        return;
+      }
+
+      Swal.fire({
+        title: 'พบข้อมูลที่กรอกค้างไว้',
+        text: 'ต้องการดึงข้อมูลที่กรอกไว้ล่าสุดกลับมาหรือไม่?',
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'ดึงข้อมูลกลับมา',
+        cancelButtonText: 'เริ่มฟอร์มใหม่',
+        confirmButtonColor: '#0d9488'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          applyDraft(parsed.data);
+        } else {
+          clearDraft();
+        }
+      });
+    }
+
+    function applyDraft(data) {
+      const form = document.getElementById('recordForm');
+      Array.from(form.elements).forEach(el => {
+        if (!el.name || !(el.name in data)) return;
+        el.value = data[el.name];
+      });
+
+      document.getElementById('serviceType').dispatchEvent(new Event('change'));
+      toggleIPDFields();
+      checkNationality();
+      checkWard();
+
+      if (data._province) {
+        document.getElementById('province').value = data._province;
+        loadDistricts();
+        if (data._district) {
+          document.getElementById('district').value = data._district;
+          loadSubDistricts();
+          if (data._subDistrict) document.getElementById('subDistrict').value = data._subDistrict;
+        }
+      }
+      checkCostSum();
+    }
+
+    function handleClearForm() {
+      Swal.fire({
+        title: 'ล้างข้อมูลในฟอร์ม?',
+        text: 'ข้อมูลที่กรอกไว้ทั้งหมดจะถูกล้าง',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'ล้างข้อมูล',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#dc2626'
+      }).then((result) => {
+        if (!result.isConfirmed) return;
+        document.getElementById('recordForm').reset();
+        clearDraft();
+        setupAddressDropdowns();
+        document.getElementById('serviceDate').valueAsDate = new Date();
+        toggleIPDFields();
+        checkCostSum();
+      });
+    }
+
+    // --- Submit Form ---
+    document.getElementById('recordForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      // ตรวจสอบยอดเงินก่อนเสมอ
+      if (!checkCostSum()) {
+        Swal.fire('ยอดเงินไม่ตรงกัน', 'กรุณาตรวจสอบตัวเลขค่ารักษาให้ผลรวมตรงกับค่ารักษาเต็มจำนวนก่อนบันทึก', 'warning');
+        return;
+      }
+
+      // Prepare Data Object
+      const formData = new FormData(this);
+      const data = Object.fromEntries(formData.entries());
+
+      // Get Address Text
+      const pText = document.getElementById('province').options[document.getElementById('province').selectedIndex].text;
+      const dText = document.getElementById('district').options[document.getElementById('district').selectedIndex].text;
+      const sText = document.getElementById('subDistrict').options[document.getElementById('subDistrict').selectedIndex].text;
+      data.fullAddress = `ต.${sText} อ.${dText} จ.${pText}`;
+
+      // สรุปให้ตรวจสอบอีกครั้งก่อนบันทึกจริง
+      const c = getCostInputs();
+      const mainLabel = data.serviceType === 'อนุเคราะห์' ? 'ยอดสงเคราะห์' : 'ยอดค้างชำระ';
+      const mainVal = data.serviceType === 'อนุเคราะห์' ? c.assist : c.debt;
+
+      Swal.fire({
+        title: 'ยืนยันการบันทึกข้อมูล',
+        html: `
+          <div class="text-left text-sm space-y-1">
+            <div><b>ชื่อ-สกุล:</b> ${data.fullName || '-'}</div>
+            <div><b>HN:</b> ${data.hn || '-'}${data.an ? ' &nbsp;|&nbsp; <b>AN:</b> ' + data.an : ''}</div>
+            <div><b>ประเภทบริการ:</b> ${data.serviceType} (${data.patientType})</div>
+            <div><b>ค่ารักษาเต็ม:</b> ${c.full.toLocaleString()} บาท</div>
+            <div><b>${mainLabel}:</b> ${mainVal.toLocaleString()} บาท</div>
+          </div>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'ยืนยันบันทึก',
+        cancelButtonText: 'ตรวจสอบอีกครั้ง',
+        confirmButtonColor: '#0d9488'
+      }).then((result) => {
+        if (!result.isConfirmed) return;
+        doSubmit(data);
+      });
+    });
+
+    async function doSubmit(data) {
+      const btn = document.getElementById('btnSubmit');
+      btn.disabled = true;
+      btn.innerText = 'กำลังบันทึก...';
+
+      try {
+        const res = await apiPost('submit', data);
+        btn.disabled = false;
+        btn.innerText = 'บันทึกข้อมูล';
+
+        if (res.success) {
+          clearDraft();
+          Swal.fire({
+            icon: 'success',
+            title: 'สำเร็จ!',
+            text: res.message,
+            showConfirmButton: false,
+            timer: 1500
+          });
+          document.getElementById('recordForm').reset();
+          // Reset Default Address and IPD fields
+          setupAddressDropdowns();
+          document.getElementById('serviceDate').valueAsDate = new Date();
+          toggleIPDFields();
+          checkCostSum();
+        } else {
+          Swal.fire('ผิดพลาด', res.message, 'error');
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerText = 'บันทึกข้อมูล';
+        Swal.fire('Error', err.toString(), 'error');
+      }
+    }
+
+    function checkWard() {
+      const ward = document.getElementById('ward').value;
+      const other = document.getElementById('wardOther');
+
+      if (ward === 'อื่นๆ') {
+        other.classList.remove('hidden-field');
+        other.required = true; // บังคับกรอกถ้าเลือกอื่นๆ
+      } else {
+        other.classList.add('hidden-field');
+        other.required = false;
+        other.value = ''; // ล้างค่าเมื่อเปลี่ยนใจไม่เลือกอื่นๆ
+      }
+    }
+
+  </script>
 </body>
 </html>
